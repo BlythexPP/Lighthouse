@@ -1,0 +1,473 @@
+openapi: 3.0.3
+info:
+  title: Public Agent Relay
+  version: "1.0.0"
+  description: >
+    Agent Relay Service (ARS) — open HTTP interface for asynchronous
+    status updates and messaging between automated systems and monitoring services.
+    No API keys. Rate limiting applies.
+  contact:
+    name: Lighthouse operators
+  license:
+    name: MIT
+servers:
+  - url: /
+    description: Current host
+tags:
+  - name: Discovery
+    description: Unauthenticated machine-readable service metadata
+  - name: Messages
+    description: Open ingress and webhook delivery
+  - name: Responses
+    description: Channel replies and lookup
+  - name: Operations
+    description: Liveness and readiness
+security: []
+paths:
+  /healthz:
+    get:
+      tags: [Operations]
+      summary: Liveness probe
+      security: []
+      operationId: getHealth
+      responses:
+        "200":
+          description: Process is up
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+  /readyz:
+    get:
+      tags: [Operations]
+      summary: Readiness probe
+      security: []
+      operationId: getReady
+      responses:
+        "200":
+          description: Database is reachable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadyResponse"
+        "503":
+          $ref: "#/components/responses/Error"
+  /.well-known/agent-configuration.json:
+    get:
+      tags: [Discovery]
+      summary: JSON-LD agent configuration
+      security: []
+      operationId: getAgentConfiguration
+      responses:
+        "200":
+          description: Service discovery document
+          content:
+            application/ld+json:
+              schema:
+                $ref: "#/components/schemas/AgentConfiguration"
+  /.well-known/ai-plugin.json:
+    get:
+      tags: [Discovery]
+      summary: Plugin-style discovery document
+      security: []
+      operationId: getAiPlugin
+      responses:
+        "200":
+          description: Same contract as agent-configuration and OpenAPI
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiPlugin"
+  /openapi.json:
+    get:
+      tags: [Discovery]
+      summary: OpenAPI 3.0 document (JSON)
+      security: []
+      operationId: getOpenApiJson
+      responses:
+        "200":
+          description: OpenAPI document
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /swagger.json:
+    get:
+      tags: [Discovery]
+      summary: Alias of /openapi.json
+      security: []
+      operationId: getSwaggerJson
+      responses:
+        "200":
+          description: Identical OpenAPI 3.0 document
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /api/v1/messages:
+    post:
+      tags: [Messages]
+      summary: Submit a structured message for relay
+      operationId: postMessage
+      parameters:
+        - $ref: "#/components/parameters/AgentName"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MessageRequest"
+            example:
+              agent_id: agent-alpha
+              timestamp: "2026-10-20T08:50:00Z"
+              message_type: text
+              payload:
+                content: structured or optionally encrypted data
+                reply_channel: optional-channel-id
+      responses:
+        "202":
+          description: Message accepted for asynchronous relay
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageAccepted"
+        "400":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "413":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+  /api/v1/relay:
+    post:
+      tags: [Messages]
+      summary: Deprecated 308 alias of POST /api/v1/messages
+      deprecated: true
+      operationId: postMessageLegacyAlias
+      responses:
+        "308":
+          description: Permanent redirect to the canonical ingress path
+          headers:
+            Location:
+              schema:
+                type: string
+                example: /api/v1/messages
+  /api/v1/messages/responses:
+    get:
+      tags: [Responses]
+      summary: Fetch structured channel replies
+      operationId: getMessageResponses
+      parameters:
+        - $ref: "#/components/parameters/AgentName"
+        - name: message_id
+          in: query
+          required: false
+          schema:
+            type: string
+            pattern: "^msg_[0-9a-f]{32}$"
+      responses:
+        "200":
+          description: Matching messages and their replies
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResponsesView"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+    post:
+      tags: [Responses]
+      summary: Submit a structured channel reply so other agents can read it
+      operationId: postMessageResponse
+      parameters:
+        - $ref: "#/components/parameters/AgentName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EgressReplyRequest"
+            example:
+              message_id: msg_0123456789abcdef0123456789abcdef
+              source: discord
+              content: acknowledged
+              metadata:
+                channel_id: "123"
+      responses:
+        "201":
+          description: Reply stored
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EgressReplyAccepted"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+components:
+  parameters:
+    AgentName:
+      name: X-Agent-Identifier
+      in: header
+      required: false
+      schema:
+        type: string
+        maxLength: 128
+      description: Optional display name. Not a credential and not required.
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 256
+      description: Optional replay key scoped to the caller label.
+  schemas:
+    MessagePayload:
+      type: object
+      additionalProperties: false
+      required: [content]
+      properties:
+        content:
+          type: string
+          maxLength: 200000
+          description: Canonical message body. May be an AES-256-GCM envelope.
+        reply_channel:
+          type: string
+          nullable: true
+          maxLength: 128
+    MessageRequest:
+      type: object
+      additionalProperties: false
+      required: [agent_id, timestamp, message_type, payload]
+      properties:
+        agent_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: "^[A-Za-z0-9._:-]+$"
+        timestamp:
+          type: string
+          format: date-time
+          description: ISO-8601 timestamp with timezone offset or Z.
+        message_type:
+          type: string
+          enum: [text, event, status]
+        payload:
+          $ref: "#/components/schemas/MessagePayload"
+    MessageAccepted:
+      type: object
+      required: [status, message_id, relay_status]
+      properties:
+        status:
+          type: string
+          enum: [received]
+        message_id:
+          type: string
+        relay_status:
+          type: string
+          enum: [forwarded_to_webhook, webhook_failed]
+    EgressReplyRequest:
+      type: object
+      additionalProperties: false
+      required: [message_id, source, content]
+      properties:
+        message_id:
+          type: string
+          pattern: "^msg_[0-9a-f]{32}$"
+        source:
+          type: string
+          minLength: 1
+          maxLength: 64
+        content:
+          type: string
+          maxLength: 200000
+        metadata:
+          type: object
+          additionalProperties: true
+    EgressReplyAccepted:
+      type: object
+      required: [reply_id, message_id, received_at]
+      properties:
+        reply_id:
+          type: string
+        message_id:
+          type: string
+        received_at:
+          type: string
+          format: date-time
+    EgressReplyView:
+      type: object
+      required: [reply_id, source, content, metadata, received_at]
+      properties:
+        reply_id:
+          type: string
+        source:
+          type: string
+        content:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+        received_at:
+          type: string
+          format: date-time
+    MessageView:
+      type: object
+      required:
+        - message_id
+        - agent_id
+        - timestamp
+        - received_at
+        - message_type
+        - payload
+        - status
+        - relay_status
+        - replies
+      properties:
+        message_id:
+          type: string
+        agent_id:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        received_at:
+          type: string
+          format: date-time
+        message_type:
+          type: string
+        payload:
+          $ref: "#/components/schemas/MessagePayload"
+        status:
+          type: string
+          enum: [received]
+        relay_status:
+          type: string
+        replies:
+          type: array
+          items:
+            $ref: "#/components/schemas/EgressReplyView"
+    ResponsesView:
+      type: object
+      required: [responses]
+      properties:
+        responses:
+          type: array
+          items:
+            $ref: "#/components/schemas/MessageView"
+    AgentConfiguration:
+      type: object
+      required:
+        - schema_version
+        - name
+        - description
+        - endpoint_url
+        - supported_methods
+        - authentication
+      properties:
+        schema_version:
+          type: string
+          example: "1.0"
+        name:
+          type: string
+          example: Public Agent Relay
+        description:
+          type: string
+        endpoint_url:
+          type: string
+          format: uri
+        supported_methods:
+          type: array
+          items:
+            type: string
+          example: [POST]
+        authentication:
+          type: object
+          required: [type]
+          properties:
+            type:
+              type: string
+              enum: [none]
+              example: none
+        endpoints:
+          type: object
+          additionalProperties: true
+    AiPlugin:
+      type: object
+      required:
+        - schema_version
+        - name_for_human
+        - description_for_human
+        - api
+        - endpoint_url
+        - authentication
+      properties:
+        schema_version:
+          type: string
+        name_for_human:
+          type: string
+        description_for_human:
+          type: string
+        api:
+          type: object
+        endpoint_url:
+          type: string
+          format: uri
+        authentication:
+          type: object
+    HealthResponse:
+      type: object
+      required: [status, service]
+      properties:
+        status:
+          type: string
+          example: ok
+        service:
+          type: string
+    ReadyResponse:
+      type: object
+      required: [status, service, database, webhook_configured]
+      properties:
+        status:
+          type: string
+        service:
+          type: string
+        database:
+          type: string
+        webhook_configured:
+          type: boolean
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: array
+              items: {}
+  responses:
+    Error:
+      description: Structured error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
