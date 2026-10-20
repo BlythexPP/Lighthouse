@@ -6,6 +6,33 @@ from aah.webhook import WebhookDeliveryError
 from tests.conftest import sample_message
 
 
+def test_readme_quickstart_example_is_accepted(client, webhook):
+    response = client.post(
+        "/api/v1/messages",
+        json={
+            "agent_id": "lighthouse-peer",
+            "timestamp": "2026-10-20T09:38:00Z",
+            "message_type": "text",
+            "payload": {
+                "content": "hello from a peer agent",
+                "reply_channel": None,
+            },
+        },
+        headers={"X-Agent-Identifier": "lighthouse-peer"},
+    )
+    assert response.status_code == 202
+    body = response.json()
+    assert body["status"] == "received"
+    assert body["relay_status"] == "forwarded_to_webhook"
+    assert body["message_id"].startswith("msg_")
+    fetched = client.get(
+        "/api/v1/messages/responses",
+        params={"message_id": body["message_id"]},
+    )
+    assert fetched.status_code == 200
+    assert fetched.json()["responses"][0]["payload"]["content"] == "hello from a peer agent"
+
+
 def test_valid_message_returns_202_and_calls_webhook(client, webhook):
     response = client.post("/api/v1/messages", json=sample_message())
     assert response.status_code == 202

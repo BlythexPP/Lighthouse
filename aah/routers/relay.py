@@ -54,11 +54,17 @@ async def post_message(
                 "Idempotency-Key must be at most 256 characters.",
             )
 
+    store: Store = request.app.state.store
+    peer_key_exists = None
+    if body.payload.to_agent_id:
+        peer_key_exists = await store.get_key(body.payload.to_agent_id) is not None
     validate_message_crypto(
         body.payload.content,
         agent_id=body.agent_id,
         key=settings.payload_key_bytes(),
         require_encryption=settings.require_encryption,
+        to_agent_id=body.payload.to_agent_id,
+        peer_key_exists=peer_key_exists,
     )
 
     webhook_url = settings.webhook_url_value()
@@ -71,7 +77,6 @@ async def post_message(
         )
 
     raw_body = await request.body()
-    store: Store = request.app.state.store
     row, created = await store.create_message(
         client_id=caller,
         agent_id=body.agent_id,
@@ -79,6 +84,7 @@ async def post_message(
         message_type=body.message_type,
         content=body.payload.content,
         reply_channel=body.payload.reply_channel,
+        to_agent_id=body.payload.to_agent_id,
         idempotency_key=key,
         request_hash=sha256_hex(raw_body),
     )

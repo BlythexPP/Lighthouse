@@ -18,8 +18,13 @@ class MessagePayload(BaseModel):
 
     content: str = Field(min_length=0, max_length=200_000)
     reply_channel: str | None = Field(default=None, max_length=128)
+    to_agent_id: str | None = Field(
+        default=None,
+        max_length=128,
+        pattern=r"^[A-Za-z0-9._:-]+$",
+    )
 
-    @field_validator("reply_channel", mode="before")
+    @field_validator("reply_channel", "to_agent_id", mode="before")
     @classmethod
     def empty_channel_to_none(cls, value: Any) -> Any:
         if value == "":
@@ -93,6 +98,19 @@ class MessageView(BaseModel):
     status: Literal["received"]
     relay_status: str
     replies: list[EgressReplyView]
+
+
+class KeyPublishRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    agent_id: str = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9._:-]+$")
+    public_key: str = Field(min_length=1, max_length=128)
+
+
+class KeyView(BaseModel):
+    agent_id: str
+    public_key: str
+    updated_at: str
 
 
 class ResponsesView(BaseModel):

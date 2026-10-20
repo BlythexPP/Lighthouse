@@ -10,7 +10,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm import selectinload
 
-from aah.db import MessageRow, ReplyRow
+from aah.crypto import b64encode, decode_public_key
+from aah.db import AgentKeyRow, MessageRow, ReplyRow
 from aah.errors import AppError
 from aah.util import new_message_id, new_reply_id, utc_z
 
@@ -30,6 +31,7 @@ class Store:
         message_type: str,
         content: str,
         reply_channel: str | None,
+        to_agent_id: str | None,
         idempotency_key: str | None,
         request_hash: str,
     ) -> tuple[MessageRow, bool]:
@@ -54,6 +56,7 @@ class Store:
             message_type=message_type,
             content=content,
             reply_channel=reply_channel,
+            to_agent_id=to_agent_id,
             relay_status="accepted",
             delivery_attempts=0,
             last_delivery_error=None,
@@ -152,3 +155,25 @@ class Store:
             await session.commit()
             await session.refresh(row)
             return row
+
+    async def upsert_key(self, *, agent_id: str, public_key: str) -> tuple[AgentKeyRow, bool]:
+        raw = decode_public_key(public_key)
+        canonical = b64encode(raw)
+        now = utc_z()
+        async with self._sessions() as session:
+            existing = await session.get(AgentKeyRow, agent_id)
+            if existing is None:
+                row = AgentKeyRow(agent_id=agent_id, public_key=canonical, updated_at=now)
+                session.add(row)
+                await session.commit()
+                await session.refresh(row)
+                return row, True
+            existing.public_key = canonical
+            existing.updated_at = now
+            await session.commit()
+            await session.refresh(existing)
+            return existing, False
+
+    async def get_key(self, agent_id: str) -> AgentKeyRow | None:
+        async with self._sessions() as session:
+            return await session.get(AgentKeyRow, agent_id)

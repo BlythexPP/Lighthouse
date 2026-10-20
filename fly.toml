@@ -1,0 +1,40 @@
+# Public Fly.io host for the Agent Relay Service.
+# Suggested app name: lighthouse-aah (change if taken).
+# Never put secrets in this file. AAH_WEBHOOK_URL is `fly secrets set` only.
+# After the first deploy, set AAH_PUBLIC_BASE_URL to the real https://*.fly.dev URL.
+
+app = "lighthouse-aah"
+primary_region = "fra"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  AAH_HOST = "0.0.0.0"
+  AAH_PORT = "8080"
+  AAH_DATABASE_URL = "sqlite+aiosqlite:////data/aah.db"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+[[http_service.checks]]
+  grace_period = "10s"
+  interval = "15s"
+  method = "GET"
+  timeout = "2s"
+  path = "/healthz"
+
+[[vm]]
+  memory = "256mb"
+  cpu_kind = "shared"
+  cpus = 1
+
+[[mounts]]
+  source = "aah_data"
+  destination = "/data"
+  initial_size = "1gb"

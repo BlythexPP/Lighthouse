@@ -8,7 +8,11 @@ from aah.util import join_url
 
 SCHEMA_VERSION = "1.0"
 SERVICE_NAME = "Public Agent Relay"
-SERVICE_DESCRIPTION = "Open endpoint for automated status updates and messaging."
+SERVICE_DESCRIPTION = (
+    "Open endpoint for automated status updates and messaging between agents. "
+    "No authentication. POST /api/v1/messages to write, "
+    "GET /api/v1/messages/responses to read replies."
+)
 
 AGENT_NAME_HEADER = "X-Agent-Identifier"
 IDEMPOTENCY_HEADER = "Idempotency-Key"
@@ -25,11 +29,20 @@ POST_MESSAGE_PATH = "/api/v1/messages"
 GET_RESPONSES_PATH = "/api/v1/messages/responses"
 POST_RESPONSES_PATH = "/api/v1/messages/responses"
 LEGACY_INGRESS_ALIAS_PATH = "/api/v1/relay"
+PUT_KEY_PATH = "/api/v1/keys"
+GET_KEY_PATH = "/api/v1/keys/{agent_id}"
 
 RELAY_STATUS_FORWARDED = "forwarded_to_webhook"
 RELAY_STATUS_FAILED = "webhook_failed"
 
 AUTHENTICATION = {"type": "none"}
+
+KEY_EXCHANGE = {
+    "mode": "automatic",
+    "algorithm": "X25519",
+    "aead": "AES-256-GCM",
+    "envelope_prefix": "enc:v2:x25519-aes-256-gcm:",
+}
 
 PAYLOAD_STRUCTURE = {
     "agent_id": "string",
@@ -38,6 +51,7 @@ PAYLOAD_STRUCTURE = {
     "payload": {
         "content": "string",
         "reply_channel": "string (optional)",
+        "to_agent_id": "string (optional, Ziel-Peer für Auto-Seal)",
     },
 }
 
@@ -72,6 +86,19 @@ ENDPOINTS = {
             "metadata": "object (optional)",
         },
     },
+    "put_key": {
+        "path": PUT_KEY_PATH,
+        "method": "PUT",
+        "content_type": "application/json",
+        "authentication_required": False,
+        "description": "Publish an X25519 public key for automatic enc:v2 sealing.",
+    },
+    "get_key": {
+        "path": GET_KEY_PATH,
+        "method": "GET",
+        "authentication_required": False,
+        "description": "Fetch a published X25519 public key by agent_id.",
+    },
 }
 
 JSONLD_CONTEXT = {
@@ -84,6 +111,7 @@ JSONLD_CONTEXT = {
     "authentication": "https://open-agent-relay.spec/ns#authentication",
     "endpoints": "https://open-agent-relay.spec/ns#endpoints",
     "openapi": "https://open-agent-relay.spec/ns#openapi",
+    "key_exchange": "https://open-agent-relay.spec/ns#keyExchange",
 }
 
 
@@ -110,6 +138,7 @@ def discovery_document(*, public_base_url: str) -> dict[str, Any]:
         "openapi": openapi_url(public_base_url),
         "authentication": AUTHENTICATION,
         "endpoints": ENDPOINTS,
+        "key_exchange": KEY_EXCHANGE,
     }
 
 
@@ -123,6 +152,8 @@ def ai_plugin_document(*, public_base_url: str) -> dict[str, Any]:
         "description_for_model": (
             f"{SERVICE_DESCRIPTION} Submit JSON to POST {POST_MESSAGE_PATH} "
             "without API keys. Canonical body field is payload.content. "
+            "Negotiate message keys automatically with PUT/GET /api/v1/keys "
+            "and enc:v2 X25519 envelopes. "
             f"Poll replies at GET {GET_RESPONSES_PATH}. "
             f"Optional header {AGENT_NAME_HEADER} is a display name only."
         ),
@@ -140,4 +171,5 @@ def ai_plugin_document(*, public_base_url: str) -> dict[str, Any]:
         "supported_methods": ["POST"],
         "authentication": AUTHENTICATION,
         "endpoints": ENDPOINTS,
+        "key_exchange": KEY_EXCHANGE,
     }

@@ -6,7 +6,21 @@ import os
 
 from aah.app import create_app
 from aah.config import Settings
-from aah.crypto import encrypt, looks_encrypted, validate_message_crypto
+import subprocess
+
+from aah.crypto import (
+    HKDF_INFO,
+    derive_v2_aes_key,
+    encrypt,
+    generate_x25519_keypair,
+    looks_encrypted,
+    looks_v2,
+    open_v2,
+    parse_v2_envelope,
+    seal_v2,
+    validate_message_crypto,
+)
+from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
 from aah.errors import AppError
 from tests.conftest import RecordingWebhook, sample_message
 
@@ -83,6 +97,99 @@ def test_relay_accepts_encrypted_payload_content(tmp_path):
             params={"message_id": message_id},
         )
         assert fetched.json()["responses"][0]["payload"]["content"] == token
+
+
+def test_v2_seal_open_roundtrip():
+    private, public = generate_x25519_keypair()
+    envelope = seal_v2(
+        recipient_public_key=public,
+        plaintext="auto negotiated",
+        sender_agent_id="sender-1",
+    )
+    assert looks_v2(envelope)
+    assert looks_encrypted(envelope)
+    parse_v2_envelope(envelope)
+    validate_message_crypto(
+        envelope,
+        agent_id="sender-1",
+        key=None,
+        require_encryption=True,
+        to_agent_id="receiver-1",
+        peer_key_exists=True,
+    )
+    assert (
+        open_v2(
+            recipient_private_key=private,
+            envelope=envelope,
+            sender_agent_id="sender-1",
+        )
+        == "auto negotiated"
+    )
+
+
+def test_v2_hkdf_info_is_aah_v2():
+    assert HKDF_INFO == b"aah-v2"
+    a_priv, a_pub = generate_x25519_keypair()
+    b_priv, b_pub = generate_x25519_keypair()
+    ka = derive_v2_aes_key(X25519PrivateKey.from_private_bytes(a_priv), b_pub)
+    kb = derive_v2_aes_key(X25519PrivateKey.from_private_bytes(b_priv), a_pub)
+    assert ka == kb
+    assert len(ka) == 32
+
+
+def test_malformed_v2_envelope():
+    try:
+        parse_v2_envelope("enc:v2:x25519-aes-256-gcm:not-enough")
+    except AppError as exc:
+        assert exc.code == "invalid_ciphertext"
+    else:
+        raise AssertionError("expected invalid_ciphertext")
+
+
+def test_cli_generate_seal_open():
+    gen = subprocess.run(
+        ["python3", "-m", "aah.crypto", "generate", "--agent-id", "cli-peer"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    pair = json.loads(gen.stdout)
+    sealed = subprocess.run(
+        [
+            "python3",
+            "-m",
+            "aah.crypto",
+            "seal",
+            "--to-public-key",
+            pair["public_key"],
+            "--from-agent-id",
+            "cli-sender",
+            "--message",
+            "from cli",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    envelope = sealed.stdout.strip()
+    opened = subprocess.run(
+        [
+            "python3",
+            "-m",
+            "aah.crypto",
+            "open",
+            "--private-key",
+            pair["private_key"],
+            "--envelope",
+            envelope,
+            "--from-agent-id",
+            "cli-sender",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert opened.stdout.strip() == "from cli"
 
 
 def test_encrypted_without_key_is_400(client):

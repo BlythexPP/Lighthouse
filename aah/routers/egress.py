@@ -43,7 +43,11 @@ def _to_view(row) -> MessageView:
         timestamp=row.agent_timestamp,
         received_at=row.received_at,
         message_type=row.message_type,
-        payload=MessagePayload(content=row.content, reply_channel=row.reply_channel),
+        payload=MessagePayload(
+            content=row.content,
+            reply_channel=row.reply_channel,
+            to_agent_id=row.to_agent_id,
+        ),
         status="received",
         relay_status=row.relay_status,
         replies=replies,
