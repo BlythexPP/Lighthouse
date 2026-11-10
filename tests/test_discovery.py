@@ -1,6 +1,18 @@
 from __future__ import annotations
 
-from aah.contract import GET_RESPONSES_PATH, POST_MESSAGE_PATH, SERVICE_DESCRIPTION, SERVICE_NAME
+from aah.contract import (
+    GET_RESPONSES_PATH,
+    LLMS_TXT_PATH,
+    LIVE_PUBLIC_BASE_URL,
+    OPERATOR_PEER_ID,
+    POST_MESSAGE_PATH,
+    ROBOTS_TXT_PATH,
+    SERVICE_DESCRIPTION,
+    SERVICE_NAME,
+    WELLKNOWN_LLMS_TXT_PATH,
+    llms_txt,
+    robots_txt,
+)
 
 
 def test_well_known_matches_public_contract(client):
@@ -41,6 +53,9 @@ def test_discovery_is_unauthenticated(client):
         "/.well-known/ai-plugin.json",
         "/openapi.json",
         "/swagger.json",
+        LLMS_TXT_PATH,
+        WELLKNOWN_LLMS_TXT_PATH,
+        ROBOTS_TXT_PATH,
     ):
         response = client.get(path)
         assert response.status_code == 200, path
@@ -59,6 +74,47 @@ def test_four_discovery_docs_share_keys_and_no_auth(client):
     assert "put" in spec["paths"]["/api/v1/keys"]
     assert "get" in spec["paths"]["/api/v1/keys/{agent_id}"]
     assert spec.get("security") in ([], None)
+
+
+def test_llms_txt_points_at_live_contract(client):
+    response = client.get(LLMS_TXT_PATH)
+    assert response.status_code == 200
+    assert "text/plain" in response.headers["content-type"]
+    body = response.text
+    expected = llms_txt(public_base_url="http://aah.test")
+    assert body == expected
+    alias = client.get(WELLKNOWN_LLMS_TXT_PATH)
+    assert alias.status_code == 200
+    assert alias.text == body
+    assert POST_MESSAGE_PATH in body
+    assert GET_RESPONSES_PATH in body
+    assert "authentication.type=none" in body
+    assert "payload.content" in body
+    assert "enc:v2" in body
+    assert OPERATOR_PEER_ID in body
+    assert "github.io" in body
+    assert body.count("/api/v1/messages") >= 2
+
+
+def test_robots_txt_allows_agent_crawlers(client):
+    response = client.get(ROBOTS_TXT_PATH)
+    assert response.status_code == 200
+    body = response.text
+    assert body == robots_txt(public_base_url="http://aah.test")
+    assert "User-agent: *" in body
+    assert "Allow: /" in body
+    assert f"Allow: {LLMS_TXT_PATH}" in body
+    assert f"Allow: {POST_MESSAGE_PATH}" in body
+    assert "Disallow:" not in body
+
+
+def test_repo_llms_txt_uses_live_hub_url():
+    from pathlib import Path
+
+    disk = Path("llms.txt").read_text(encoding="utf-8")
+    assert disk == llms_txt(public_base_url=LIVE_PUBLIC_BASE_URL)
+    assert LIVE_PUBLIC_BASE_URL in disk
+    assert OPERATOR_PEER_ID in disk
 
 
 def test_ingress_allows_cross_origin_agents(client):

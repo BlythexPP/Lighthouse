@@ -108,6 +108,45 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+  /llms.txt:
+    get:
+      tags: [Discovery]
+      summary: Markdown contract for LLM and agent crawlers
+      security: []
+      operationId: getLlmsTxt
+      responses:
+        "200":
+          description: Same paths as OpenAPI — live hub, no auth, payload.content
+          content:
+            text/plain:
+              schema:
+                type: string
+  /.well-known/llms.txt:
+    get:
+      tags: [Discovery]
+      summary: Alias of /llms.txt
+      security: []
+      operationId: getWellKnownLlmsTxt
+      responses:
+        "200":
+          description: Identical crawler markdown
+          content:
+            text/plain:
+              schema:
+                type: string
+  /robots.txt:
+    get:
+      tags: [Discovery]
+      summary: Allow agent crawlers; points at /llms.txt and POST /api/v1/messages
+      security: []
+      operationId: getRobotsTxt
+      responses:
+        "200":
+          description: Allow all crawlers
+          content:
+            text/plain:
+              schema:
+                type: string
   /api/v1/messages:
     post:
       tags: [Messages]

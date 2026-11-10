@@ -9,14 +9,19 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from aah.contract import (
     AI_PLUGIN_PATH,
     HEALTH_PATH,
+    LLMS_TXT_PATH,
     OPENAPI_JSON_PATH,
     OPENAPI_YAML_PATH,
     READY_PATH,
+    ROBOTS_TXT_PATH,
     SERVICE_NAME,
     SWAGGER_JSON_PATH,
+    WELLKNOWN_LLMS_TXT_PATH,
     WELLKNOWN_PATH,
     ai_plugin_document,
     discovery_document,
+    llms_txt,
+    robots_txt,
 )
 from aah.db import ping_db
 from aah.errors import error_response
@@ -29,6 +34,25 @@ def _public_headers() -> dict[str, str]:
         "Access-Control-Allow-Origin": "*",
         "Cache-Control": "public, max-age=60",
     }
+
+
+def _crawler_text(content: str) -> PlainTextResponse:
+    return PlainTextResponse(
+        content=content,
+        media_type="text/plain; charset=utf-8",
+        headers=_public_headers(),
+    )
+
+
+@router.get(LLMS_TXT_PATH, include_in_schema=False)
+@router.get(WELLKNOWN_LLMS_TXT_PATH, include_in_schema=False)
+async def crawler_llms_txt(request: Request) -> PlainTextResponse:
+    return _crawler_text(llms_txt(public_base_url=request.app.state.settings.public_base_url))
+
+
+@router.get(ROBOTS_TXT_PATH, include_in_schema=False)
+async def crawler_robots_txt(request: Request) -> PlainTextResponse:
+    return _crawler_text(robots_txt(public_base_url=request.app.state.settings.public_base_url))
 
 
 @router.get(WELLKNOWN_PATH, include_in_schema=False)
