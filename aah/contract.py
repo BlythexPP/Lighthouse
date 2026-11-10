@@ -24,6 +24,7 @@ SWAGGER_JSON_PATH = "/swagger.json"
 OPENAPI_YAML_PATH = "/openapi.yaml"
 HEALTH_PATH = "/healthz"
 READY_PATH = "/readyz"
+DASHBOARD_PATH = "/dashboard"
 
 POST_MESSAGE_PATH = "/api/v1/messages"
 GET_RESPONSES_PATH = "/api/v1/messages/responses"

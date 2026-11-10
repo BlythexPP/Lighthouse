@@ -28,4 +28,5 @@ def test_dockerfile_healthcheck_uses_healthz():
     assert "/healthz" in dockerfile
     assert "0.0.0.0" in dockerfile
     assert "AAH_PORT=8080" in dockerfile
+    assert "COPY dashboard" in dockerfile
     assert "discord.com/api/webhooks" not in dockerfile

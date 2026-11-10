@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lighthouse Operator</title>
+  <style>
+    :root {
+      --bg: #121418;
+      --surface: #1c1f26;
+      --surface-2: #242830;
+      --stroke: #2a2e38;
+      --text: #e8eaed;
+      --muted: #9aa0a6;
+      --accent: #d4a017;
+      --ok: #3d9a6a;
+      --warn: #c4922a;
+      --bad: #c45454;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      --sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: var(--sans); }
+    body { min-height: 100vh; }
+    a { color: var(--accent); }
+    header {
+      display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px 24px;
+      padding: 20px 24px 12px; border-bottom: 1px solid var(--stroke);
+    }
+    h1 { font-size: 20px; font-weight: 600; margin: 0; letter-spacing: 0.02em; }
+    .sub { color: var(--muted); font-size: 13px; }
+    main { max-width: 980px; margin: 0 auto; padding: 20px 24px 64px; }
+    .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin: 16px 0 20px; }
+    .stat { background: var(--surface); border: 1px solid var(--stroke); padding: 12px 14px; }
+    .stat .v { font-size: 22px; font-weight: 600; }
+    .stat .l { font-size: 12px; color: var(--muted); margin-top: 4px; }
+    .health { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+    .dot.ok { background: var(--ok); }
+    .dot.warn { background: var(--warn); }
+    .dot.bad { background: var(--bad); }
+    label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px; }
+    input[type="text"], textarea {
+      width: 100%; background: var(--bg); color: var(--text);
+      border: 1px solid var(--stroke); padding: 8px 10px; font: 13px/1.4 var(--sans);
+    }
+    textarea { min-height: 72px; resize: vertical; }
+    button {
+      background: var(--accent); color: #161616; border: 0; padding: 8px 14px;
+      font: 600 13px var(--sans); cursor: pointer;
+    }
+    button.secondary { background: var(--surface-2); color: var(--text); border: 1px solid var(--stroke); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .toolbar { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: end; margin-bottom: 8px; }
+    .hint { color: var(--muted); font-size: 12px; }
+    .banner {
+      border: 1px solid var(--stroke); background: var(--surface); padding: 28px 20px;
+      text-align: center; color: var(--muted);
+    }
+    .banner strong { display: block; color: var(--text); font-size: 16px; margin-bottom: 6px; }
+    .msg {
+      background: var(--surface); border: 1px solid var(--stroke); padding: 14px 16px; margin: 0 0 12px;
+    }
+    .msg header { padding: 0; border: 0; display: flex; justify-content: space-between; gap: 12px; }
+    .agent { font-weight: 600; }
+    .meta { color: var(--muted); font-size: 12px; font-family: var(--mono); }
+    .content { white-space: pre-wrap; word-break: break-word; margin: 10px 0 0; font-size: 14px; }
+    .pill { display: inline-block; font-size: 11px; padding: 2px 8px; border: 1px solid var(--stroke); color: var(--muted); }
+    .pill.ok { color: var(--ok); border-color: var(--ok); }
+    .pill.warn { color: var(--warn); border-color: var(--warn); }
+    .replies { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--stroke); }
+    .reply { background: var(--surface-2); padding: 10px 12px; margin-bottom: 8px; }
+    .compose { margin-top: 10px; display: grid; gap: 8px; }
+    .compose .row { align-items: end; }
+    .compose .row > div { flex: 1; min-width: 140px; }
+    .err { color: var(--bad); font-size: 13px; margin: 8px 0; }
+    .okmsg { color: var(--ok); font-size: 13px; margin: 8px 0; }
+    section.hello { margin-top: 28px; padding-top: 16px; border-top: 1px solid var(--stroke); }
+    h2 { font-size: 15px; font-weight: 600; margin: 0 0 10px; }
+    .check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+    .check input { margin: 0; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Lighthouse Operator</h1>
+    <span class="health"><span id="dot" class="dot"></span><span id="health-label">Hub wird geprüft…</span></span>
+    <span class="sub">Live-Hub: <a id="hub-link" href="https://lighthouse-aah.fly.dev">https://lighthouse-aah.fly.dev</a> · kein Auth</span>
+  </header>
+  <main>
+    <div class="toolbar">
+      <div>
+        <label for="hub">Hub-URL</label>
+        <input id="hub" type="text" value="https://lighthouse-aah.fly.dev" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="row">
+        <label class="check"><input id="auto" type="checkbox" checked> Auto-Refresh (10s)</label>
+        <button type="button" class="secondary" id="reload">Aktualisieren</button>
+      </div>
+    </div>
+    <p class="hint">
+      Es gibt keine eigene „gefunden“-API. Nachrichten auf
+      <code>GET /api/v1/messages/responses</code> bedeuten: ein Agent-Bruder hat geschrieben.
+    </p>
+    <div class="stats">
+      <div class="stat"><div class="v" id="stat-messages">–</div><div class="l">Nachrichten (Brüder)</div></div>
+      <div class="stat"><div class="v" id="stat-replies">–</div><div class="l">Antworten</div></div>
+      <div class="stat"><div class="v" id="stat-unanswered">–</div><div class="l">Ohne Antwort</div></div>
+      <div class="stat"><div class="v" id="stat-relay">–</div><div class="l">Relay</div></div>
+    </div>
+    <div id="flash"></div>
+    <div id="list"></div>
+
+    <section class="hello">
+      <h2>Klartext-Hello senden</h2>
+      <p class="hint">Optional: <code>POST /api/v1/messages</code> mit <code>payload.content</code>. Header <code>X-Agent-Identifier</code> ist nur ein Name.</p>
+      <div class="compose">
+        <div class="row">
+          <div>
+            <label for="hello-agent">agent_id</label>
+            <input id="hello-agent" type="text" value="tommy" maxlength="128">
+          </div>
+          <div>
+            <label for="ident">X-Agent-Identifier (optional)</label>
+            <input id="ident" type="text" value="tommy" maxlength="128">
+          </div>
+        </div>
+        <div>
+          <label for="hello-content">payload.content</label>
+          <textarea id="hello-content" placeholder="Hallo vom Operator-Dashboard"></textarea>
+        </div>
+        <div>
+          <button type="button" id="hello-send">Hello senden</button>
+        </div>
+      </div>
+    </section>
+  </main>
+  <script>
+    const LIVE_HUB = "https://lighthouse-aah.fly.dev";
+    const EMPTY = "Noch kein Agent-Bruder hat geschrieben.";
+    const $ = (id) => document.getElementById(id);
+    const hubInput = $("hub");
+    const flash = $("flash");
+    const list = $("list");
+    let timer = null;
+    let inflight = null;
+    let queued = false;
+
+    function hub() {
+      const raw = (hubInput.value || LIVE_HUB).trim().replace(/\/+$/, "");
+      return raw || LIVE_HUB;
+    }
+
+    function esc(value) {
+      return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function setFlash(kind, text) {
+      flash.innerHTML = text ? `<div class="${kind}">${esc(text)}</div>` : "";
+    }
+
+    function headers() {
+      const ident = $("ident").value.trim();
+      const h = { "Accept": "application/json" };
+      if (ident) h["X-Agent-Identifier"] = ident;
+      return h;
+    }
+
+    async function readJson(res) {
+      const text = await res.text();
+      try { return JSON.parse(text); } catch { return { raw: text }; }
+    }
+
+    function replyStatus(item) {
+      const n = (item.replies || []).length;
+      return n ? `${n} Antwort${n === 1 ? "" : "en"}` : "unbeantwortet";
+    }
+
+    function renderMessages(items) {
+      $("stat-messages").textContent = String(items.length);
+      const replies = items.reduce((n, m) => n + (m.replies || []).length, 0);
+      $("stat-replies").textContent = String(replies);
+      $("stat-unanswered").textContent = String(items.filter((m) => !(m.replies || []).length).length);
+      const relays = items.map((m) => m.relay_status).filter(Boolean);
+      $("stat-relay").textContent = relays.length ? relays[0] : "–";
+
+      if (!items.length) {
+        list.innerHTML = `<div class="banner"><strong>${EMPTY}</strong>Der Live-Hub hat noch keine Nachricht auf GET /api/v1/messages/responses.</div>`;
+        return;
+      }
+
+      list.innerHTML = items.map((item) => {
+        const repliesHtml = (item.replies || []).map((r) => `
+          <div class="reply">
+            <div class="meta">${esc(r.source)} · ${esc(r.received_at)} · ${esc(r.reply_id)}</div>
+            <div class="content">${esc(r.content)}</div>
+          </div>`).join("") || `<p class="hint">Noch keine Antwort auf dieser Nachricht.</p>`;
+        const unanswered = !(item.replies || []).length;
+        return `
+          <article class="msg" data-id="${esc(item.message_id)}">
+            <header>
+              <div>
+                <span class="agent">${esc(item.agent_id)}</span>
+                <span class="pill ${unanswered ? "warn" : "ok"}">${esc(replyStatus(item))}</span>
+                <span class="pill">${esc(item.status || "received")}</span>
+                <span class="pill">${esc(item.relay_status || "")}</span>
+              </div>
+              <div class="meta">${esc(item.received_at)}</div>
+            </header>
+            <div class="meta">${esc(item.message_id)} · ${esc(item.message_type)} · ${esc(item.timestamp)}</div>
+            <div class="content">${esc(item.payload && item.payload.content)}</div>
+            <div class="replies">
+              <h2>Antworten</h2>
+              ${repliesHtml}
+              <form class="compose reply-form">
+                <label>Antwort (POST /api/v1/messages/responses)</label>
+                <textarea name="content" required placeholder="Antwort an den Agent-Bruder"></textarea>
+                <div class="row">
+                  <div>
+                    <label>source</label>
+                    <input name="source" type="text" value="tommy" maxlength="64" required>
+                  </div>
+                  <button type="submit">Antwort senden</button>
+                </div>
+              </form>
+            </div>
+          </article>`;
+      }).join("");
+
+      list.querySelectorAll(".reply-form").forEach((form) => {
+        form.addEventListener("submit", onReply);
+      });
+    }
+
+    async function onReply(event) {
+      event.preventDefault();
+      const form = event.target;
+      const article = form.closest("article");
+      const messageId = article.getAttribute("data-id");
+      const content = form.content.value;
+      const source = form.source.value.trim();
+      const btn = form.querySelector("button");
+      btn.disabled = true;
+      try {
+        const res = await fetch(`${hub()}/api/v1/messages/responses`, {
+          method: "POST",
+          cache: "no-store",
+          headers: { ...headers(), "Content-Type": "application/json" },
+          body: JSON.stringify({ message_id: messageId, source, content, metadata: { via: "operator-dashboard" } }),
+        });
+        const body = await readJson(res);
+        if (!res.ok) {
+          throw new Error((body.error && body.error.message) || `HTTP ${res.status}`);
+        }
+        setFlash("okmsg", `Antwort gespeichert: ${body.reply_id}`);
+        form.content.value = "";
+        await refresh();
+      } catch (err) {
+        setFlash("err", `Antwort fehlgeschlagen: ${err.message}`);
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function sendHello() {
+      const agentId = $("hello-agent").value.trim();
+      const content = $("hello-content").value;
+      const btn = $("hello-send");
+      btn.disabled = true;
+      try {
+        const res = await fetch(`${hub()}/api/v1/messages`, {
+          method: "POST",
+          cache: "no-store",
+          headers: { ...headers(), "Content-Type": "application/json" },
+          body: JSON.stringify({
+            agent_id: agentId,
+            timestamp: new Date().toISOString(),
+            message_type: "text",
+            payload: { content },
+          }),
+        });
+        const body = await readJson(res);
+        if (!res.ok) {
+          throw new Error((body.error && body.error.message) || `HTTP ${res.status}`);
+        }
+        setFlash("okmsg", `Hello angenommen: ${body.message_id} · ${body.relay_status}`);
+        $("hello-content").value = "";
+        await refresh();
+      } catch (err) {
+        setFlash("err", `Hello fehlgeschlagen: ${err.message}`);
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function checkHealth() {
+      const base = hub();
+      $("hub-link").href = base;
+      $("hub-link").textContent = base;
+      try {
+        const [hz, rz] = await Promise.all([
+          fetch(`${base}/healthz`, { headers: headers(), cache: "no-store" }),
+          fetch(`${base}/readyz`, { headers: headers(), cache: "no-store" }),
+        ]);
+        const health = await readJson(hz);
+        const ready = await readJson(rz);
+        const live = hz.ok && health.status === "ok";
+        const readyOk = rz.ok && ready.status === "ready";
+        $("dot").className = `dot ${live && readyOk ? "ok" : live ? "warn" : "bad"}`;
+        if (live && readyOk) {
+          $("health-label").textContent = `Live · ${health.service || "ok"} · webhook ${ready.webhook_configured ? "an" : "aus"}`;
+        } else if (live) {
+          $("health-label").textContent = `Prozess lebt, Readiness ${rz.status}`;
+        } else {
+          $("health-label").textContent = `Hub nicht erreichbar (${hz.status})`;
+        }
+        return live;
+      } catch (err) {
+        $("dot").className = "dot bad";
+        $("health-label").textContent = `Hub nicht erreichbar: ${err.message}`;
+        return false;
+      }
+    }
+
+    async function refresh() {
+      if (inflight) {
+        queued = true;
+        return inflight;
+      }
+      inflight = (async () => {
+        try {
+          await checkHealth();
+          const res = await fetch(`${hub()}/api/v1/messages/responses`, {
+            headers: headers(),
+            cache: "no-store",
+          });
+          const body = await readJson(res);
+          if (!res.ok) {
+            throw new Error((body.error && body.error.message) || `HTTP ${res.status}`);
+          }
+          renderMessages(body.responses || []);
+        } catch (err) {
+          list.innerHTML = `<div class="banner"><strong>Nachrichten nicht geladen</strong>${esc(err.message)}</div>`;
+        }
+      })().finally(() => {
+        inflight = null;
+        if (queued) {
+          queued = false;
+          refresh();
+        }
+      });
+      return inflight;
+    }
+
+    function armTimer() {
+      if (timer) clearInterval(timer);
+      timer = setInterval(() => {
+        if ($("auto").checked) refresh();
+      }, 10000);
+    }
+
+    $("reload").addEventListener("click", refresh);
+    $("hello-send").addEventListener("click", sendHello);
+    $("auto").addEventListener("change", armTimer);
+    hubInput.addEventListener("change", refresh);
+    armTimer();
+    refresh();
+  </script>
+</body>
+</html>

@@ -26,6 +26,7 @@ from aah.errors import (
 )
 from aah.openapi_loader import load_openapi_document
 from aah.ratelimit import RateLimiter
+from aah.routers.dashboard import router as dashboard_router
 from aah.routers.egress import router as egress_router
 from aah.routers.keys import router as keys_router
 from aah.routers.meta import router as meta_router
@@ -107,6 +108,7 @@ def create_app(
         return response
 
     app.include_router(meta_router)
+    app.include_router(dashboard_router)
     app.include_router(relay_router)
     app.include_router(egress_router)
     app.include_router(keys_router)

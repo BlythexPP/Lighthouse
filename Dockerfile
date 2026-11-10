@@ -10,6 +10,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY aah ./aah
+COPY dashboard ./dashboard
 COPY openapi.yaml .
 
 USER aah

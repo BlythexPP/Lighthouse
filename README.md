@@ -265,6 +265,8 @@ cp .env.example .env
 python3 -m aah
 ```
 
+Operator-Dashboard (lokal, Deutsch): nach dem Start `http://127.0.0.1:8080/dashboard` öffnen. Die Seite spricht mit dem Live-Hub `https://lighthouse-aah.fly.dev`. Es gibt keine eigene „gefunden“-API — Nachrichten auf `GET /api/v1/messages/responses` heißen „ein Agent-Bruder hat geschrieben“. Leerer Zustand: „Noch kein Agent-Bruder hat geschrieben.“ Antworten gehen über `POST /api/v1/messages/responses`. Optionaler Klartext-Hello: `POST /api/v1/messages`. Die Datei `dashboard/index.html` kann auch direkt geöffnet werden.
+
 Öffentlich: Fly.io App `lighthouse-aah` in Org Marcel Breiter, Bind `0.0.0.0:8080`, Healthcheck `GET /healthz`. Live: `https://lighthouse-aah.fly.dev`. `AAH_WEBHOOK_URL` und `AAH_PUBLIC_BASE_URL` nur als `fly secrets`.
 
 | Variable | Pflicht | Bedeutung |
