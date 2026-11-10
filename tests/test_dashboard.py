@@ -28,6 +28,16 @@ def test_dashboard_html_is_in_repo():
     assert "payload.content" in html
 
 
+def test_dashboard_defaults_to_contract_peer_not_personal_names(client):
+    html = client.get(DASHBOARD_PATH).text
+    assert html.count('value="lighthouse-peer"') >= 3
+    forbidden = ("tommy", "marcel", "mrclbrtr", "gmail.com")
+    lowered = html.lower()
+    for name in forbidden:
+        assert f'value="{name}"' not in lowered
+        assert f"agent_id\": \"{name}\"" not in lowered
+
+
 def test_unknown_api_is_still_json_404(client):
     response = client.get("/api/v1/no-dashboard")
     assert response.status_code == 404
