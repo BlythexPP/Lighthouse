@@ -7,6 +7,7 @@ from pathlib import Path
 import yaml
 
 from aah.contract import ENDPOINTS, OPENAPI_JSON_PATH, SERVICE_DESCRIPTION, SERVICE_NAME, SWAGGER_JSON_PATH
+from aah.crypto import b64encode, generate_x25519_keypair
 
 
 def _readme() -> str:
@@ -106,6 +107,11 @@ def test_readme_is_agent_discovery_surface():
     assert "enc:v2:x25519-aes-256-gcm:" in readme
     assert "PUT /api/v1/keys" in readme
     assert "GET /api/v1/keys/{peer_agent_id}" in readme
+    assert "GET /api/v1/keys/{agent_id}" in readme
+    assert '"responses"' in readme
+    assert '"reply_id"' in readme
+    assert '"source": "lighthouse-peer"' in readme
+    assert '"updated_at"' in readme
     assert "aah-v2" in readme
     assert "authentication.type=none" in readme
     assert "YOUR_PUBLIC_BASE" not in readme
@@ -117,6 +123,9 @@ def test_readme_is_agent_discovery_surface():
     assert "lighthouse-aah.fly.dev" not in readme
     assert "## 6. Betrieb" in readme
     assert readme.index("## 0. Quick start") < readme.index("## 6. Betrieb")
+    pyproject = Path("pyproject.toml").read_text(encoding="utf-8")
+    assert "authenticated HTTP relay" not in pyproject
+    assert "open HTTP relay" in pyproject
 
 
 def test_readme_discovery_example_matches_live_contract(client):
@@ -144,3 +153,58 @@ def test_readme_discovery_example_matches_live_contract(client):
     assert live["key_exchange"]["mode"] == "automatic"
     assert live["key_exchange"]["algorithm"] == "X25519"
     assert live["key_exchange"]["envelope_prefix"] == "enc:v2:x25519-aes-256-gcm:"
+    assert "key_exchange" in spec["components"]["schemas"]["AgentConfiguration"]["properties"]
+    assert "to_agent_id" in spec["components"]["schemas"]["MessagePayload"]["properties"]
+
+
+def test_agent_can_drive_from_readme_examples(client):
+    """A peer agent can follow README JSON without extra docs."""
+    posted = client.post(
+        "/api/v1/messages",
+        json={
+            "agent_id": "lighthouse-peer",
+            "timestamp": "2026-10-20T09:38:00Z",
+            "message_type": "text",
+            "payload": {
+                "content": "hello from a peer agent",
+                "reply_channel": None,
+            },
+        },
+    )
+    assert posted.status_code == 202
+    message_id = posted.json()["message_id"]
+
+    listed = client.get(
+        "/api/v1/messages/responses",
+        params={"message_id": message_id},
+    )
+    assert listed.status_code == 200
+    item = listed.json()["responses"][0]
+    assert item["payload"]["content"] == "hello from a peer agent"
+    assert item["status"] == "received"
+    assert "replies" in item
+
+    replied = client.post(
+        "/api/v1/messages/responses",
+        json={
+            "message_id": message_id,
+            "source": "lighthouse-peer",
+            "content": "ack from peer",
+            "metadata": {},
+        },
+    )
+    assert replied.status_code == 201
+    assert replied.json()["message_id"] == message_id
+    assert replied.json()["reply_id"].startswith("rpl_")
+
+    _private, public = generate_x25519_keypair()
+    published = client.put(
+        "/api/v1/keys",
+        json={"agent_id": "lighthouse-peer", "public_key": b64encode(public)},
+    )
+    assert published.status_code == 200
+    fetched = client.get("/api/v1/keys/lighthouse-peer")
+    assert fetched.status_code == 200
+    assert fetched.json()["agent_id"] == "lighthouse-peer"
+    assert "public_key" in fetched.json()
+    assert "updated_at" in fetched.json()

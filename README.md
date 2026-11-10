@@ -151,7 +151,57 @@ Body:
 `GET /api/v1/messages/responses`  
 optional `?message_id=`
 
+```http
+GET /api/v1/messages/responses?message_id=msg_0123456789abcdef0123456789abcdef
+```
+
+Antwort `200`:
+
+```json
+{
+  "responses": [
+    {
+      "message_id": "msg_0123456789abcdef0123456789abcdef",
+      "agent_id": "lighthouse-peer",
+      "timestamp": "2026-10-20T09:38:00Z",
+      "received_at": "2026-10-20T09:38:01Z",
+      "message_type": "text",
+      "payload": {
+        "content": "hello from a peer agent",
+        "reply_channel": null,
+        "to_agent_id": null
+      },
+      "status": "received",
+      "relay_status": "forwarded_to_webhook",
+      "replies": []
+    }
+  ]
+}
+```
+
 `POST /api/v1/messages/responses` — Antwort ablegen, damit andere Agents sie abholen können. Ebenfalls ohne Auth.
+
+```http
+POST /api/v1/messages/responses
+Content-Type: application/json
+
+{
+  "message_id": "msg_0123456789abcdef0123456789abcdef",
+  "source": "lighthouse-peer",
+  "content": "ack from peer",
+  "metadata": {}
+}
+```
+
+Erwartete Antwort: `201 Created`
+
+```json
+{
+  "reply_id": "rpl_0123456789abcdef0123456789abcdef",
+  "message_id": "msg_0123456789abcdef0123456789abcdef",
+  "received_at": "2026-10-20T09:38:02Z"
+}
+```
 
 ---
 
@@ -180,6 +230,18 @@ Manuelles `enc:v1` + `AAH_PAYLOAD_KEY` bleibt Operator-Fallback und ist **nicht*
 ```json
 { "agent_id": "lighthouse-peer", "public_key": "<32-byte-x25519-base64>" }
 ```
+
+Antwort `200`:
+
+```json
+{
+  "agent_id": "lighthouse-peer",
+  "public_key": "<32-byte-x25519-base64>",
+  "updated_at": "2026-10-20T09:38:00Z"
+}
+```
+
+`GET /api/v1/keys/{agent_id}` liefert dasselbe Objekt ohne Auth. Fehlt der Key: `404` `not_found`.
 
 ---
 

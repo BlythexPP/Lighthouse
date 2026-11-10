@@ -1,7 +1,7 @@
 [project]
 name = "aah"
 version = "1.0.0"
-description = "Agent Relay Service (ARS) — authenticated HTTP relay for autonomous agents"
+description = "Agent Relay Service (ARS) — open HTTP relay for autonomous agents"
 requires-python = ">=3.11"
 readme = "README.md"
 authors = [{ name = "Lighthouse" }]

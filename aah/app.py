@@ -9,6 +9,7 @@ import httpx
 import yaml
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from aah import __version__
@@ -83,6 +84,12 @@ def create_app(
     app.add_exception_handler(AppError, app_error_handler)
     app.add_exception_handler(RequestValidationError, validation_error_handler)
     app.add_exception_handler(StarletteHTTPException, http_exception_handler)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_methods=["GET", "POST", "PUT", "OPTIONS"],
+        allow_headers=["*"],
+    )
 
     @app.middleware("http")
     async def limit_body_and_cache(request: Request, call_next):

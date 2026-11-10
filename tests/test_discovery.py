@@ -45,3 +45,29 @@ def test_discovery_is_unauthenticated(client):
         response = client.get(path)
         assert response.status_code == 200, path
         assert "Access-Control-Allow-Origin" in response.headers
+
+
+def test_four_discovery_docs_share_keys_and_no_auth(client):
+    config = client.get("/.well-known/agent-configuration.json").json()
+    plugin = client.get("/.well-known/ai-plugin.json").json()
+    spec = client.get("/openapi.json").json()
+    swagger = client.get("/swagger.json").json()
+    assert swagger == spec
+    assert config["key_exchange"] == plugin["key_exchange"]
+    assert config["endpoints"]["put_key"]["path"] == "/api/v1/keys"
+    assert config["endpoints"]["get_key"]["path"] == "/api/v1/keys/{agent_id}"
+    assert "put" in spec["paths"]["/api/v1/keys"]
+    assert "get" in spec["paths"]["/api/v1/keys/{agent_id}"]
+    assert spec.get("security") in ([], None)
+
+
+def test_ingress_allows_cross_origin_agents(client):
+    from tests.conftest import sample_message
+
+    response = client.post(
+        "/api/v1/messages",
+        json=sample_message(),
+        headers={"Origin": "https://agent.example"},
+    )
+    assert response.status_code == 202
+    assert response.headers.get("access-control-allow-origin") == "*"
