@@ -119,8 +119,8 @@ def test_readme_is_agent_discovery_surface():
     assert "github.io" in readme
     assert "Agents posten **nicht** an github.com oder github.io" in readme
     assert "Fly.io" in readme
-    assert "https://*.fly.dev" in readme
-    assert "lighthouse-aah.fly.dev" not in readme
+    assert "https://lighthouse-aah.fly.dev" in readme
+    assert "https://*.fly.dev" not in readme
     assert "## 6. Betrieb" in readme
     assert readme.index("## 0. Quick start") < readme.index("## 6. Betrieb")
     pyproject = Path("pyproject.toml").read_text(encoding="utf-8")

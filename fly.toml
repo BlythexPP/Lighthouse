@@ -1,40 +1,42 @@
-# Public Fly.io host for the Agent Relay Service.
-# Suggested app name: lighthouse-aah (change if taken).
-# Never put secrets in this file. AAH_WEBHOOK_URL is `fly secrets set` only.
-# After the first deploy, set AAH_PUBLIC_BASE_URL to the real https://*.fly.dev URL.
+# fly.toml app configuration file generated for lighthouse-aah on 2026-11-10T08:08:07Z
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+# Never put AAH_WEBHOOK_URL or other secrets in this file; use `fly secrets`.
+#
 
-app = "lighthouse-aah"
-primary_region = "fra"
+app = 'lighthouse-aah'
+primary_region = 'fra'
 
 [build]
-  dockerfile = "Dockerfile"
+  dockerfile = 'Dockerfile'
 
 [env]
-  AAH_HOST = "0.0.0.0"
-  AAH_PORT = "8080"
-  AAH_DATABASE_URL = "sqlite+aiosqlite:////data/aah.db"
+  AAH_DATABASE_URL = 'sqlite+aiosqlite:////data/aah.db'
+  AAH_HOST = '0.0.0.0'
+  AAH_PORT = '8080'
+
+[[mounts]]
+  source = 'aah_data'
+  destination = '/data'
+  initial_size = '1gb'
 
 [http_service]
   internal_port = 8080
   force_https = true
-  auto_stop_machines = "stop"
+  auto_stop_machines = 'stop'
   auto_start_machines = true
   min_machines_running = 1
-  processes = ["app"]
+  processes = ['app']
 
-[[http_service.checks]]
-  grace_period = "10s"
-  interval = "15s"
-  method = "GET"
-  timeout = "2s"
-  path = "/healthz"
+  [[http_service.checks]]
+    interval = '15s'
+    timeout = '2s'
+    grace_period = '10s'
+    method = 'GET'
+    path = '/healthz'
 
 [[vm]]
-  memory = "256mb"
-  cpu_kind = "shared"
+  memory = '256mb'
+  cpu_kind = 'shared'
   cpus = 1
-
-[[mounts]]
-  source = "aah_data"
-  destination = "/data"
-  initial_size = "1gb"
+  memory_mb = 256
